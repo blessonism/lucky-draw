@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🧧 新年福利</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--red:#C41E3A;--gold:#FFD700;--dark:#1a0a0a;--glass:rgba(255,255,255,0.08)}
+body{
+  min-height:100vh;
+  background:var(--dark);
+  background-image:
+    radial-gradient(ellipse at 20% 50%, rgba(196,30,58,0.3) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 20%, rgba(255,69,0,0.2) 0%, transparent 50%);
+  font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;
+  color:#fff;
+  overflow-x:hidden;
+}
+
+/* 布局 */
+.page{display:flex;flex-direction:column;align-items:center;min-height:100vh;position:relative}
+
+/* 顶部装饰 */
+.header{text-align:center;padding:40px 20px 20px;position:relative;z-index:2}
+.header h1{font-size:2em;background:linear-gradient(135deg,var(--gold),#FFA500);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:2px}
+.header p{color:rgba(255,255,255,0.5);font-size:0.9em;margin-top:6px}
+
+/* 主区域 */
+.main{flex:1;display:flex;flex-direction:column;align-items:center;padding:0 20px;max-width:400px;width:100%;position:relative;z-index:2}
+
+/* 转盘 */
+.wheel-wrap{position:relative;width:280px;height:280px;margin:10px auto 25px}
+.wheel-glow{
+  position:absolute;width:300px;height:300px;top:-10px;left:-10px;border-radius:50%;
+  background:conic-gradient(from 0deg,var(--gold),#FFA500,var(--gold),#FFA500,var(--gold),#FFA500,var(--gold),#FFA500);
+  opacity:0.6;filter:blur(2px);
+  animation:spin-glow 8s linear infinite;
+}
+@keyframes spin-glow{to{transform:rotate(360deg)}}
+canvas#wheel{position:absolute;top:0;left:0;width:280px;height:280px;border-radius:50%;z-index:2}
+.pointer{position:absolute;top:-14px;left:50%;transform:translateX(-50%);z-index:3;font-size:28px;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.6))}
+
+/* 输入 */
+.input-group{width:100%;margin-bottom:16px}
+.input-group input{
+  width:100%;padding:14px 20px;border:1px solid rgba(255,215,0,0.3);border-radius:14px;
+  background:var(--glass);color:#fff;font-size:15px;text-align:center;outline:none;
+  backdrop-filter:blur(20px);transition:all 0.3s;
+}
+.input-group input::placeholder{color:rgba(255,255,255,0.35)}
+.input-group input:focus{border-color:var(--gold);box-shadow:0 0 20px rgba(255,215,0,0.15)}
+
+.btn-draw{
+  width:100%;padding:15px;border:none;border-radius:14px;
+  background:linear-gradient(135deg,var(--gold),#FFA500);
+  color:var(--dark);font-size:1.1em;font-weight:700;cursor:pointer;
+  transition:all 0.2s;position:relative;overflow:hidden;
+}
+.btn-draw:hover{transform:translateY(-1px);box-shadow:0 8px 25px rgba(255,165,0,0.4)}
+.btn-draw:active{transform:translateY(0)}
+.btn-draw:disabled{opacity:0.5;cursor:not-allowed;transform:none}
+.btn-draw::after{
+  content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.3),transparent);
+  transition:0.5s;
+}
+.btn-draw:hover::after{left:100%}
+
+.hint{text-align:center;margin-top:12px;font-size:0.75em;color:rgba(255,255,255,0.3)}
+
+/* ===== 中奖播报条 ===== */
+.ticker-section{
+  width:100%;max-width:400px;margin-top:30px;padding:0 20px 30px;position:relative;z-index:2;
+}
+.ticker-bar{
+  background:var(--glass);backdrop-filter:blur(20px);
+  border:1px solid rgba(255,215,0,0.15);border-radius:14px;
+  padding:0;overflow:hidden;height:42px;position:relative;
+}
+.ticker-label{
+  position:absolute;left:0;top:0;bottom:0;width:70px;
+  background:linear-gradient(135deg,var(--red),#8B0000);
+  display:flex;align-items:center;justify-content:center;
+  font-size:0.75em;font-weight:700;color:var(--gold);z-index:1;
+  border-radius:14px 0 0 14px;
+}
+.ticker-track{
+  margin-left:70px;height:100%;overflow:hidden;position:relative;
+}
+.ticker-scroll{
+  display:flex;flex-direction:column;
+  animation:ticker-up 0s linear infinite;
+}
+.ticker-msg{
+  height:42px;display:flex;align-items:center;padding:0 14px;
+  font-size:0.82em;color:rgba(255,255,255,0.75);white-space:nowrap;
+}
+.ticker-msg .emoji{margin-right:6px}
+.ticker-msg .name{color:var(--gold);font-weight:600}
+
+/* ===== PC 侧边播报 ===== */
+@media(min-width:900px){
+  .page{flex-direction:row;justify-content:center;align-items:flex-start}
+  .center-col{flex:0 0 440px;display:flex;flex-direction:column;align-items:center;min-height:100vh}
+  .ticker-section{
+    position:fixed;right:30px;top:50%;transform:translateY(-50%);
+    width:240px;max-width:240px;padding:0;margin:0;
+  }
+  .ticker-bar{
+    height:auto;max-height:320px;border-radius:16px;flex-direction:column;
+  }
+  .ticker-label{
+    position:relative;width:100%;height:36px;border-radius:16px 16px 0 0;
+  }
+  .ticker-track{
+    margin-left:0;height:auto;max-height:284px;overflow:hidden;
+  }
+  .ticker-scroll{animation:none}
+  .ticker-msg{
+    height:auto;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.05);
+    white-space:normal;font-size:0.8em;
+  }
+  .ticker-scroll{
+    display:flex;flex-direction:column;
+  }
+}
+
+@keyframes ticker-up{
+  0%{transform:translateY(0)}
+  100%{transform:translateY(-50%)}
+}
+
+/* ===== 弹窗 ===== */
+.modal-overlay{
+  display:none;position:fixed;top:0;left:0;right:0;bottom:0;
+  background:rgba(0,0,0,0.75);z-index:200;
+  justify-content:center;align-items:center;backdrop-filter:blur(8px);
+}
+.modal-overlay.show{display:flex}
+
+.modal{
+  background:linear-gradient(160deg,#1e1e2e,#2a1a1a);
+  border:1px solid rgba(255,215,0,0.2);
+  border-radius:24px;padding:35px 28px;max-width:360px;width:88%;
+  text-align:center;color:#fff;
+  box-shadow:0 25px 80px rgba(0,0,0,0.5);
+  animation:modalIn 0.5s cubic-bezier(0.175,0.885,0.32,1.275);
+}
+@keyframes modalIn{from{transform:scale(0.7) translateY(30px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
+
+.modal .tier-badge{
+  display:inline-block;padding:8px 24px;border-radius:50px;
+  font-size:1.1em;font-weight:700;margin-bottom:20px;
+  animation:tierBounce 0.6s ease-out;
+}
+.tier-1{background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a0a}
+.tier-2{background:linear-gradient(135deg,#C0C0C0,#E8E8E8);color:#333}
+.tier-3{background:linear-gradient(135deg,#CD7F32,#DEB887);color:#fff}
+@keyframes tierBounce{0%{transform:scale(0)}60%{transform:scale(1.2)}100%{transform:scale(1)}}
+
+.prize-reveal{min-height:70px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.prize-name{font-size:1.4em;font-weight:700;color:var(--gold);margin-bottom:4px;animation:fadeUp 0.4s ease-out 0.8s both}
+.prize-desc{font-size:0.9em;color:rgba(255,255,255,0.5);margin-bottom:12px;animation:fadeUp 0.4s ease-out 1s both}
+.wish{font-size:0.95em;color:#FF8A65;margin-bottom:16px;font-style:italic;animation:fadeUp 0.4s ease-out 1.2s both}
+@keyframes fadeUp{from{transform:translateY(15px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+.code-box{
+  background:rgba(255,215,0,0.08);border:1px dashed rgba(255,215,0,0.3);
+  border-radius:14px;padding:14px;margin-bottom:14px;
+  animation:fadeUp 0.4s ease-out 1.4s both;
+}
+.code-label{font-size:0.75em;color:rgba(255,255,255,0.4);margin-bottom:4px}
+.code-value{font-size:1.3em;font-weight:700;color:var(--gold);letter-spacing:3px;font-family:'Courier New',monospace}
+
+.contact{
+  background:rgba(255,255,255,0.05);border-radius:12px;padding:12px;
+  font-size:0.85em;color:rgba(255,255,255,0.6);
+  animation:fadeUp 0.4s ease-out 1.6s both;
+}
+
+.btn-close{
+  margin-top:18px;padding:10px 28px;border:none;border-radius:50px;
+  background:linear-gradient(135deg,var(--red),#8B0000);
+  color:#fff;font-size:0.95em;cursor:pointer;
+  animation:fadeUp 0.4s ease-out 1.8s both;transition:transform 0.2s;
+}
+.btn-close:hover{transform:scale(1.05)}
+
+/* 彩带 */
+#confetti{position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:150}
+
+/* 背景粒子 */
+.particle{
+  position:fixed;border-radius:50%;pointer-events:none;z-index:0;
+  background:radial-gradient(circle,rgba(255,215,0,0.15),transparent);
+  animation:float linear infinite;
+}
+@keyframes float{
+  0%{transform:translateY(0) scale(1);opacity:0.3}
+  50%{opacity:0.6}
+  100%{transform:translateY(-100vh) scale(0.5);opacity:0}
+}
+
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+</style>
+</head>
+<body>
+
+<div class="page">
+  <div class="center-col">
+    <div class="header">
+      <h1>🧧 新年福利</h1>
+      <p>感谢红包，抽个奖回礼</p>
+    </div>
+
+    <div class="main">
+      <div class="wheel-wrap">
+        <div class="wheel-glow"></div>
+        <canvas id="wheel" width="560" height="560"></canvas>
+        <div class="pointer">▼</div>
+      </div>
+
+      <div class="input-group">
+        <input type="text" id="nickname" placeholder="输入你的昵称" maxlength="20" />
+      </div>
+
+      <button class="btn-draw" id="btnDraw" onclick="startDraw()">开始抽奖</button>
+      <p class="hint">每人限抽一次 · 100% 中奖</p>
+    </div>
+
+    <!-- 播报条 -->
+    <div class="ticker-section" id="tickerSection" style="display:none">
+      <div class="ticker-bar">
+        <div class="ticker-label">🎉 喜报</div>
+        <div class="ticker-track">
+          <div class="ticker-scroll" id="tickerScroll"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<canvas id="confetti"></canvas>
+
+<!-- 弹窗 -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="tier-badge" id="modalTier"></div>
+    <div class="prize-reveal">
+      <div class="prize-name" id="modalName"></div>
+      <div class="prize-desc" id="modalDesc"></div>
+    </div>
+    <div class="wish" id="modalWish"></div>
+    <div class="code-box">
+      <div class="code-label">兑换码</div>
+      <div class="code-value" id="modalCode"></div>
+    </div>
+    <div class="contact">📱 截图保存兑换码，联系我兑奖</div>
+    <button class="btn-close" onclick="closeModal()">收下了！</button>
+  </div>
+</div>
+
+<script>
+let prizes=[], spinning=false, currentRotation=0;
+
+async function init(){
+  const r=await fetch('/api/prizes');
+  prizes=await r.json();
+  drawWheel();
+  createParticles();
+  loadTicker();
+}
+
+/* 隐私化名字：保留首字，其余用 * */
+function maskName(name){
+  if(!name) return '***';
+  const s=name.trim();
+  if(s.length<=1) return s+'*';
+  return s[0]+'*'.repeat(s.length-1);
+}
+
+/* 转盘 */
+function drawWheel(){
+  const c=document.getElementById('wheel'), ctx=c.getContext('2d');
+  const cx=280,cy=280,r=270,n=prizes.length,arc=2*Math.PI/n;
+  const colors=['#C41E3A','#B8860B','#8B0000','#CD853F','#A0522D','#DAA520','#800020','#CC7722'];
+
+  for(let i=0;i<n;i++){
+    const s=i*arc,e=s+arc;
+    ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,r,s,e);
+    ctx.fillStyle=colors[i%colors.length];ctx.fill();
+
+    ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+r*Math.cos(s),cy+r*Math.sin(s));
+    ctx.strokeStyle='rgba(255,215,0,0.2)';ctx.lineWidth=1;ctx.stroke();
+
+    ctx.save();ctx.translate(cx,cy);ctx.rotate(s+arc/2);
+    ctx.fillStyle='rgba(255,255,255,0.9)';
+    ctx.font='bold 20px "PingFang SC",sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    const name=prizes[i].name.replace(/\s*[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu,'');
+    name.split('').forEach((ch,ci)=>{ctx.fillText(ch,0,-r+45+ci*24)});
+    ctx.restore();
+  }
+  ctx.beginPath();ctx.arc(cx,cy,36,0,2*Math.PI);
+  ctx.fillStyle='#1a0a0a';ctx.fill();
+  ctx.beginPath();ctx.arc(cx,cy,33,0,2*Math.PI);
+  ctx.strokeStyle='var(--gold)';ctx.lineWidth=2;ctx.stroke();
+  ctx.fillStyle='#FFD700';ctx.font='bold 14px sans-serif';
+  ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('GO',cx,cy);
+}
+
+/* 抽奖 */
+async function startDraw(){
+  if(spinning) return;
+  const nickname=document.getElementById('nickname').value.trim();
+  if(!nickname){
+    const inp=document.getElementById('nickname');
+    inp.style.animation='none';inp.offsetHeight;inp.style.animation='shake 0.4s';
+    return;
+  }
+  spinning=true;
+  document.getElementById('btnDraw').disabled=true;
+
+  const res=await fetch('/api/draw',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({nickname})
+  });
+  const data=await res.json();
+
+  if(data.error){alert(data.error);spinning=false;document.getElementById('btnDraw').disabled=false;return}
+  if(data.already){
+    showResult(data.prize,data.tierName||data.prize.tierName,'你已经抽过啦～这是你的奖品 😊');
+    spinning=false;document.getElementById('btnDraw').disabled=false;return;
+  }
+
+  const prize=data.prize;
+  const idx=prizes.findIndex(p=>p.id===prize.id);
+  const n=prizes.length, arc=360/n;
+  const target=360-(idx*arc+arc/2);
+  const spins=5+Math.floor(Math.random()*3);
+  const total=spins*360+target;
+
+  const canvas=document.getElementById('wheel');
+  canvas.style.transition='transform 4s cubic-bezier(0.17,0.67,0.12,0.99)';
+  currentRotation+=total;
+  canvas.style.transform=`rotate(${currentRotation}deg)`;
+
+  setTimeout(()=>{
+    canvas.style.transition='';
+    spinning=false;
+    document.getElementById('btnDraw').disabled=false;
+    launchConfetti();
+    showResult(prize,data.tierName,data.message);
+    addTickerMsg(nickname,data.tierName);
+  },4200);
+}
+
+/* 弹窗 */
+function showResult(prize,tierName,message){
+  const t=document.getElementById('modalTier');
+  t.textContent=tierName;t.className='tier-badge tier-'+prize.tier;
+  document.getElementById('modalName').textContent=prize.name;
+  document.getElementById('modalDesc').textContent=prize.desc;
+  document.getElementById('modalWish').textContent=message;
+  document.getElementById('modalCode').textContent=prize.code||'—';
+  document.getElementById('modal').classList.add('show');
+}
+function closeModal(){document.getElementById('modal').classList.remove('show')}
+
+/* 播报 */
+async function loadTicker(){
+  const r=await fetch('/api/draws');
+  const draws=await r.json();
+  if(draws.length===0) return;
+  document.getElementById('tickerSection').style.display='';
+  const el=document.getElementById('tickerScroll');
+  el.innerHTML='';
+  const msgs=draws.reverse().map(d=>buildTickerHTML(d.nickname,d.tierName));
+  // 复制一份用于无缝滚动
+  const all=[...msgs,...msgs];
+  all.forEach(html=>{const div=document.createElement('div');div.className='ticker-msg';div.innerHTML=html;el.appendChild(div)});
+  startTickerAnimation(draws.length);
+}
+
+function buildTickerHTML(nickname,tierName){
+  const masked=maskName(nickname);
+  const phrases=['恭喜','🎊 恭喜','好运降临！恭喜','🍀 恭喜'];
+  const phrase=phrases[Math.floor(Math.random()*phrases.length)];
+  return `<span class="emoji">🎉</span>${phrase} <span class="name">${esc(masked)}</span> 获得${esc(tierName)}！`;
+}
+
+function addTickerMsg(nickname,tierName){
+  document.getElementById('tickerSection').style.display='';
+  const el=document.getElementById('tickerScroll');
+  const div=document.createElement('div');
+  div.className='ticker-msg';
+  div.innerHTML=buildTickerHTML(nickname,tierName);
+  el.insertBefore(div,el.firstChild);
+  // 重新计算动画
+  const count=el.children.length;
+  startTickerAnimation(Math.ceil(count/2));
+}
+
+function startTickerAnimation(count){
+  const el=document.getElementById('tickerScroll');
+  const isPC=window.innerWidth>=900;
+  if(isPC){
+    // PC: 不需要滚动动画，静态列表
+    el.style.animation='none';
+  } else {
+    // 手机: 上下滚动
+    const h=42*count;
+    el.style.animation=`ticker-up ${count*3}s linear infinite`;
+  }
+}
+
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+/* 彩带 */
+function launchConfetti(){
+  const c=document.getElementById('confetti'),ctx=c.getContext('2d');
+  c.width=innerWidth;c.height=innerHeight;
+  const P=[],colors=['#FFD700','#FF6B6B','#FF4500','#FFA500','#FF1493','#00FF88','#4FC3F7','#E040FB','#C41E3A'];
+  for(let i=0;i<200;i++) P.push({
+    x:Math.random()*c.width, y:Math.random()*c.height-c.height,
+    w:6+Math.random()*8, h:3+Math.random()*5,
+    color:colors[Math.floor(Math.random()*colors.length)],
+    vx:(Math.random()-0.5)*6, vy:2+Math.random()*5,
+    rot:Math.random()*360, rv:(Math.random()-0.5)*12, op:1
+  });
+  let f=0;
+  (function go(){
+    ctx.clearRect(0,0,c.width,c.height);
+    let alive=false;
+    P.forEach(p=>{
+      if(p.op<=0)return;alive=true;
+      p.x+=p.vx;p.y+=p.vy;p.vy+=0.06;p.rot+=p.rv;
+      if(f>80)p.op-=0.008;
+      ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot*Math.PI/180);
+      ctx.globalAlpha=Math.max(0,p.op);ctx.fillStyle=p.color;
+      ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);ctx.restore();
+    });
+    f++;
+    if(alive&&f<350) requestAnimationFrame(go);
+    else ctx.clearRect(0,0,c.width,c.height);
+  })();
+}
+
+/* 背景粒子 */
+function createParticles(){
+  for(let i=0;i<8;i++){
+    const p=document.createElement('div');p.className='particle';
+    const size=60+Math.random()*120;
+    p.style.cssText=`width:${size}px;height:${size}px;left:${Math.random()*100}vw;bottom:-${size}px;animation-duration:${8+Math.random()*12}s;animation-delay:${Math.random()*5}s`;
+    document.body.appendChild(p);
+  }
+}
+
+init();
+</script>
+</body>
+</html>
