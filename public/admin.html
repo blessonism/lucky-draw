@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>抽奖管理后台</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "PingFang SC", sans-serif; background: #1a1a2e; color: #e0e0e0; min-height: 100vh; padding: 20px; }
+  .container { max-width: 800px; margin: 0 auto; }
+  h1 { text-align: center; color: #FFD700; margin-bottom: 8px; font-size: 1.5em; }
+  .subtitle { text-align: center; color: #888; font-size: 0.85em; margin-bottom: 24px; }
+
+  .auth { text-align: center; margin-bottom: 24px; }
+  .auth input { padding: 10px 16px; border-radius: 8px; border: 1px solid #444; background: #2a2a3e; color: #fff; font-size: 1em; width: 200px; }
+  .auth button { padding: 10px 20px; border-radius: 8px; border: none; background: #FFD700; color: #1a1a2e; font-weight: 700; cursor: pointer; margin-left: 8px; }
+
+  .section { background: #16213e; border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid #2a2a4e; }
+  .section h2 { color: #FFD700; font-size: 1.1em; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; padding: 8px 12px; color: #888; font-size: 0.85em; border-bottom: 1px solid #333; }
+  td { padding: 10px 12px; border-bottom: 1px solid #222; vertical-align: middle; }
+  tr.drawn { opacity: 0.4; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; font-weight: 600; }
+  .badge-0 { background: linear-gradient(135deg, #FFD700, #FF6B35); color: #1a1a2e; }
+  .badge-1 { background: linear-gradient(135deg, #FF4444, #FF6B6B); color: #fff; }
+  .badge-2 { background: linear-gradient(135deg, #FF8E53, #FFA500); color: #fff; }
+  .badge-3 { background: linear-gradient(135deg, #888, #bbb); color: #333; }
+
+  input[type="number"] { width: 70px; padding: 6px 8px; border-radius: 6px; border: 1px solid #444; background: #2a2a3e; color: #fff; font-size: 0.95em; text-align: center; }
+  input[type="number"]:focus { outline: none; border-color: #FFD700; }
+
+  .prob-bar { height: 6px; border-radius: 3px; background: #333; margin-top: 4px; overflow: hidden; }
+  .prob-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+
+  .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+  .btn { padding: 10px 24px; border-radius: 8px; border: none; font-weight: 700; cursor: pointer; font-size: 0.95em; transition: all 0.2s; }
+  .btn-save { background: #FFD700; color: #1a1a2e; }
+  .btn-save:hover { background: #FFA500; }
+  .btn-reset { background: #444; color: #e0e0e0; }
+  .btn-reset:hover { background: #555; }
+  .btn-danger { background: #E53935; color: #fff; }
+  .btn-danger:hover { background: #C62828; }
+
+  .toast { position: fixed; top: 20px; right: 20px; padding: 12px 24px; border-radius: 8px; color: #fff; font-weight: 600; transform: translateX(120%); transition: transform 0.3s; z-index: 999; }
+  .toast.show { transform: translateX(0); }
+  .toast-ok { background: #2E7D32; }
+  .toast-err { background: #C62828; }
+
+  .draws-list { max-height: 300px; overflow-y: auto; }
+  .draw-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #222; font-size: 0.9em; }
+  .draw-item .name { color: #FFD700; }
+  .draw-item .code { font-family: monospace; color: #888; font-size: 0.85em; }
+  .draw-item .time { color: #555; font-size: 0.8em; }
+
+  .empty { text-align: center; color: #555; padding: 20px; }
+  #content { display: none; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>抽奖管理后台</h1>
+  <p class="subtitle">调整概率 / 查看记录 / 重置抽奖</p>
+
+  <div class="auth" id="authBox">
+    <input type="password" id="authKey" placeholder="输入管理密钥" onkeydown="if(event.key==='Enter')doAuth()">
+    <button onclick="doAuth()">进入</button>
+  </div>
+
+  <div id="content">
+    <!-- 概率配置 -->
+    <div class="section">
+      <h2>概率与扇区配置</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>奖项</th>
+            <th>奖品</th>
+            <th>扇区大小</th>
+            <th>概率权重</th>
+            <th>实际概率</th>
+            <th>状态</th>
+          </tr>
+        </thead>
+        <tbody id="configBody"></tbody>
+      </table>
+      <div class="actions">
+        <button class="btn btn-reset" onclick="loadConfig()">还原</button>
+        <button class="btn btn-save" onclick="saveConfig()">保存配置</button>
+      </div>
+    </div>
+
+    <!-- 中奖记录 -->
+    <div class="section">
+      <h2>中奖记录</h2>
+      <div class="draws-list" id="drawsList"></div>
+    </div>
+
+    <!-- 危险操作 -->
+    <div class="section">
+      <h2>危险操作</h2>
+      <div class="actions" style="justify-content:flex-start">
+        <button class="btn btn-danger" onclick="doReset()">重置所有抽奖数据</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let KEY = '';
+let config = [];
+
+function doAuth() {
+  KEY = document.getElementById('authKey').value.trim();
+  if (!KEY) return;
+  loadConfig().then(ok => {
+    if (ok) {
+      document.getElementById('authBox').style.display = 'none';
+      document.getElementById('content').style.display = 'block';
+      loadDraws();
+    }
+  });
+}
+
+async function loadConfig() {
+  try {
+    const r = await fetch('/api/admin/config?key=' + KEY);
+    if (!r.ok) { toast('密钥错误', 'err'); return false; }
+    config = await r.json();
+    renderConfig();
+    return true;
+  } catch (e) { toast('加载失败', 'err'); return false; }
+}
+
+function renderConfig() {
+  const tbody = document.getElementById('configBody');
+  const totalProb = config.filter(p => !p.drawn).reduce((s, p) => s + p.prob, 0);
+  tbody.innerHTML = config.map(p => {
+    const pct = p.drawn ? '-' : (totalProb > 0 ? (p.prob / totalProb * 100).toFixed(1) + '%' : '0%');
+    const barW = p.drawn ? 0 : (totalProb > 0 ? p.prob / totalProb * 100 : 0);
+    const colors = { 0: '#FFD700', 1: '#FF4444', 2: '#FF8E53', 3: '#888' };
+    return `<tr class="${p.drawn ? 'drawn' : ''}">
+      <td><span class="badge badge-${p.tier || 3}">${p.tierName}</span></td>
+      <td>${p.name}</td>
+      <td><input type="number" min="0.5" max="10" step="0.5" value="${p.visualWeight}" data-id="${p.id}" data-field="visualWeight" ${p.drawn ? 'disabled' : ''} onchange="recalc()"></td>
+      <td><input type="number" min="0" max="100" step="1" value="${p.prob}" data-id="${p.id}" data-field="prob" ${p.drawn ? 'disabled' : ''} onchange="recalc()"></td>
+      <td>
+        ${pct}
+        <div class="prob-bar"><div class="prob-fill" style="width:${barW}%;background:${colors[p.tier] || '#888'}"></div></div>
+      </td>
+      <td>${p.drawn ? '<span style="color:#E53935">已抽</span>' : '<span style="color:#4CAF50">待抽</span>'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function recalc() {
+  document.querySelectorAll('input[data-field]').forEach(inp => {
+    const id = parseInt(inp.dataset.id);
+    const field = inp.dataset.field;
+    const p = config.find(x => x.id === id);
+    if (p) p[field] = parseFloat(inp.value) || 0;
+  });
+  renderConfig();
+}
+
+async function saveConfig() {
+  const updates = config.map(p => ({ id: p.id, prob: p.prob, visualWeight: p.visualWeight }));
+  try {
+    const r = await fetch('/api/admin/config?key=' + KEY, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    });
+    if (!r.ok) { toast('保存失败', 'err'); return; }
+    toast('配置已保存', 'ok');
+    loadConfig();
+  } catch (e) { toast('保存失败', 'err'); }
+}
+
+async function loadDraws() {
+  try {
+    const r = await fetch('/api/admin/draws?key=' + KEY);
+    const data = await r.json();
+    const el = document.getElementById('drawsList');
+    if (!data.draws || data.draws.length === 0) {
+      el.innerHTML = '<div class="empty">暂无中奖记录</div>';
+      return;
+    }
+    el.innerHTML = data.draws.map(d => `
+      <div class="draw-item">
+        <span class="name">${esc(d.nickname)}</span>
+        <span class="badge badge-${d.tier || 3}">${esc(d.tierName)}</span>
+        <span>${esc(d.prizeName)}</span>
+        <span class="code">${esc(d.code)}</span>
+        <span class="time">${new Date(d.time).toLocaleString('zh-CN')}</span>
+      </div>
+    `).join('');
+  } catch (e) {}
+}
+
+async function doReset() {
+  if (!confirm('确定要重置所有抽奖数据吗？此操作不可撤回！')) return;
+  if (!confirm('再次确认：所有中奖记录和兑换码都将被清除！')) return;
+  try {
+    await fetch('/api/admin/reset?key=' + KEY, { method: 'POST' });
+    toast('已重置', 'ok');
+    loadConfig();
+    loadDraws();
+  } catch (e) { toast('重置失败', 'err'); }
+}
+
+function toast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast toast-' + type + ' show';
+  setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+</script>
+</body>
+</html>

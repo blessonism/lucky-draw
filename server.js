@@ -10,16 +10,18 @@ const DATA_FILE = path.join(__dirname, 'data.json');
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 奖品池 - 带兑换码前缀
+// 奖品池 — 8 扇区，大小 & 概率均可独立调整
+// visualWeight : 转盘扇区视觉大小（越大扇区越宽，纯展示）
+// prob         : 实际中奖概率权重（越大越容易被抽到）← 改这里调概率！
 const PRIZES = [
-  { id: 1, name: '请你喝一杯 ☕', desc: '星巴克任选一杯', tier: 1, tierName: '一等奖', color: '#FFD700', count: 1 },
-  { id: 2, name: '视频月卡 🎬', desc: '爱奇艺/B站大会员月卡', tier: 1, tierName: '一等奖', color: '#FF6B6B', count: 1 },
-  { id: 3, name: '咖啡挂耳包 ☕', desc: '精选手冲挂耳一盒', tier: 2, tierName: '二等奖', color: '#FF8E53', count: 1 },
-  { id: 4, name: '盲盒零食 🎁', desc: '惊喜零食大礼包', tier: 2, tierName: '二等奖', color: '#FFA07A', count: 1 },
-  { id: 5, name: '音乐月卡 🎵', desc: '网易云/QQ音乐月卡', tier: 2, tierName: '二等奖', color: '#FF7043', count: 1 },
-  { id: 6, name: '会员周卡 📺', desc: '视频平台会员周卡', tier: 3, tierName: '三等奖', color: '#FF5252', count: 1 },
-  { id: 7, name: '帮你一件事 🤝', desc: '免费帮你搞定一件小事', tier: 3, tierName: '三等奖', color: '#E91E63', count: 1 },
-  { id: 8, name: 'AI 工具额度 🤖', desc: 'ChatGPT/Claude 额度', tier: 3, tierName: '三等奖', color: '#F44336', count: 1 },
+  { id: 1, tier: 0, tierName: '超级大奖', name: '请你喝一杯 ☕', desc: '星巴克任选一杯',       color: '#E53935', count: 1, visualWeight: 2,   prob: 2  },
+  { id: 2, tier: 3, tierName: '二等奖',   name: '会员周卡 📺',   desc: '视频平台会员周卡',     color: '#6A1B9A', count: 1, visualWeight: 4,   prob: 15 },
+  { id: 3, tier: 2, tierName: '一等奖',   name: '视频月卡 🎬',   desc: '爱奇艺/B站大会员月卡', color: '#EF6C00', count: 1, visualWeight: 3,   prob: 10 },
+  { id: 4, tier: 3, tierName: '二等奖',   name: '盲盒零食 🎁',   desc: '惊喜零食大礼包',       color: '#1565C0', count: 1, visualWeight: 4,   prob: 15 },
+  { id: 5, tier: 1, tierName: '特等奖',   name: '咖啡挂耳包 ☕', desc: '精选手冲挂耳一盒',     color: '#C2185B', count: 1, visualWeight: 2.5, prob: 5  },
+  { id: 6, tier: 3, tierName: '二等奖',   name: '音乐月卡 🎵',   desc: '网易云/QQ音乐月卡',     color: '#00695C', count: 1, visualWeight: 4,   prob: 15 },
+  { id: 7, tier: 2, tierName: '一等奖',   name: '帮你一件事 🤝', desc: '免费帮你搞定一件小事', color: '#D81B60', count: 1, visualWeight: 3,   prob: 10 },
+  { id: 8, tier: 3, tierName: '二等奖',   name: 'AI 工具额度 🤖', desc: 'ChatGPT/Claude 额度', color: '#283593', count: 1, visualWeight: 4,   prob: 15 },
 ];
 
 function genCode() {
@@ -30,7 +32,18 @@ function loadData() {
   if (fs.existsSync(DATA_FILE)) {
     const raw = fs.readFileSync(DATA_FILE, 'utf-8').trim();
     if (raw) {
-      try { return JSON.parse(raw); } catch (e) { /* corrupted, reset */ }
+      try {
+        const data = JSON.parse(raw);
+        // 兼容旧数据：补齐 prob / visualWeight
+        for (const r of data.remaining) {
+          const ref = PRIZES.find(p => p.id === r.id);
+          if (ref) {
+            if (r.prob == null) r.prob = ref.prob;
+            if (r.visualWeight == null) r.visualWeight = ref.visualWeight;
+          }
+        }
+        return data;
+      } catch (e) { /* corrupted, reset */ }
     }
   }
   return { draws: [], remaining: PRIZES.map(p => ({ ...p })) };
@@ -42,7 +55,7 @@ function saveData(data) {
 
 // 获取奖品列表（前端转盘用）
 app.get('/api/prizes', (req, res) => {
-  res.json(PRIZES.map(p => ({ id: p.id, name: p.name, color: p.color, tier: p.tier, tierName: p.tierName })));
+  res.json(PRIZES.map(p => ({ id: p.id, name: p.name, color: p.color, tier: p.tier, tierName: p.tierName, visualWeight: p.visualWeight })));
 });
 
 // 获取中奖记录（侧边栏滚动用）
@@ -82,8 +95,14 @@ app.post('/api/draw', (req, res) => {
     return res.status(410).json({ error: '奖品已全部抽完啦！' });
   }
 
-  // 随机抽取
-  const idx = Math.floor(Math.random() * data.remaining.length);
+  // 加权随机抽取（按 prob 权重）
+  const totalProb = data.remaining.reduce((sum, p) => sum + p.prob, 0);
+  let rand = Math.random() * totalProb;
+  let idx = 0;
+  for (let i = 0; i < data.remaining.length; i++) {
+    rand -= data.remaining[i].prob;
+    if (rand <= 0) { idx = i; break; }
+  }
   const prize = data.remaining.splice(idx, 1)[0];
   const code = genCode();
 
@@ -113,6 +132,41 @@ app.get('/api/admin/draws', (req, res) => {
   if (key !== 'edom2025') return res.status(403).json({ error: '无权限' });
   const data = loadData();
   res.json(data);
+});
+
+// 获取奖品概率配置
+app.get('/api/admin/config', (req, res) => {
+  const key = req.query.key;
+  if (key !== 'edom2025') return res.status(403).json({ error: '无权限' });
+  const data = loadData();
+  const remaining = data.remaining.map(p => p.id);
+  res.json(PRIZES.map(p => ({
+    id: p.id, tierName: p.tierName, name: p.name,
+    visualWeight: p.visualWeight, prob: p.prob,
+    drawn: !remaining.includes(p.id)
+  })));
+});
+
+// 更新概率配置
+app.post('/api/admin/config', (req, res) => {
+  const key = req.query.key;
+  if (key !== 'edom2025') return res.status(403).json({ error: '无权限' });
+  const updates = req.body; // [{ id, prob, visualWeight }]
+  if (!Array.isArray(updates)) return res.status(400).json({ error: '格式错误' });
+  for (const u of updates) {
+    const p = PRIZES.find(x => x.id === u.id);
+    if (!p) continue;
+    if (typeof u.prob === 'number' && u.prob >= 0) p.prob = u.prob;
+    if (typeof u.visualWeight === 'number' && u.visualWeight > 0) p.visualWeight = u.visualWeight;
+  }
+  // 同步更新 remaining 中的 prob/visualWeight
+  const data = loadData();
+  for (const r of data.remaining) {
+    const p = PRIZES.find(x => x.id === r.id);
+    if (p) { r.prob = p.prob; r.visualWeight = p.visualWeight; }
+  }
+  saveData(data);
+  res.json({ ok: true, prizes: PRIZES.map(p => ({ id: p.id, prob: p.prob, visualWeight: p.visualWeight })) });
 });
 
 app.post('/api/admin/reset', (req, res) => {
