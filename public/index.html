@@ -840,6 +840,12 @@
       const textOuterR = sr - textOuterGap;
       const textCenterY = -((textInnerR + textOuterR) / 2);
 
+      // 清理可能残留的阴影状态，避免影响文字描边
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+      ctx.shadowColor = 'transparent';
+
       // 4. 文字 — 字号随扇区宽度自适应
       for (let i = 0; i < n; i++) {
         const { start: s, arc } = sectors[i];
@@ -848,20 +854,43 @@
         const charGap = arcDeg < 28 ? 22 : arcDeg < 38 ? 25 : 28;
         ctx.save(); ctx.translate(cx, cy); ctx.rotate(s + arc / 2);
         ctx.font = `bold ${fontSize}px "PingFang SC",sans-serif`;
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.textAlign = 'center';
+        // middle 基线对 CJK 会有轻微光学偏差，改为 alphabetic + metrics 精确居中
+        ctx.textBaseline = 'alphabetic';
+
         const label = prizes[i].tierName;
         const tier = prizes[i].tier;
         const textColor = tier === 0 ? '#FFEEB0' : tier === 1 ? '#FF4444' : '#fff';
         const strokeColor = tier === 0 ? 'rgba(180,140,0,0.6)' : tier === 1 ? 'rgba(100,70,0,0.7)' : 'rgba(0,0,0,0.5)';
         const chars = label.split('');
-        const totalTextH = (chars.length - 1) * charGap;
-        // 径向居中：文字块中心固定在可用径向空间中点
-        // 可用空间 = [中心按钮外缘 + 间距, 扇区外缘 - 边距]
-        const startY = textCenterY - totalTextH / 2;
-        chars.forEach((ch, ci) => {
-          const ty = startY + ci * charGap;
-          ctx.strokeStyle = strokeColor; ctx.lineWidth = 3; ctx.strokeText(ch, 0, ty);
-          ctx.fillStyle = textColor; ctx.fillText(ch, 0, ty);
+
+        // 基于实际字形包围盒计算竖排文本块中心，而不是只按字符锚点均分
+        const metrics = chars.map((ch, ci) => {
+          const m = ctx.measureText(ch);
+          return {
+            ch,
+            ci,
+            ascent: m.actualBoundingBoxAscent || fontSize * 0.78,
+            descent: m.actualBoundingBoxDescent || fontSize * 0.22,
+          };
+        });
+        const minTerm = Math.min(...metrics.map(g => -g.ascent + g.ci * charGap));
+        const maxTerm = Math.max(...metrics.map(g => g.descent + g.ci * charGap));
+
+        // 宽扇区（visualWeight=4）会受到渐变明暗与描边厚度叠加影响，视觉上略偏内侧，做轻微外移补偿
+        const opticalNudge = arcDeg >= 50 ? -4 : 0; // 620px 画布坐标，约等于 CSS 2px
+        const targetCenterY = textCenterY + opticalNudge;
+        const baseY = targetCenterY - (minTerm + maxTerm) / 2;
+
+        ctx.strokeStyle = strokeColor;
+        ctx.fillStyle = textColor;
+        ctx.lineWidth = 3;
+        ctx.lineJoin = 'round';
+
+        metrics.forEach(g => {
+          const ty = baseY + g.ci * charGap;
+          ctx.strokeText(g.ch, 0, ty);
+          ctx.fillText(g.ch, 0, ty);
         });
         ctx.restore();
       }
