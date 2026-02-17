@@ -846,15 +846,8 @@
         const tier = prizes[i].tier;
         const textColor = tier === 0 ? '#FFEEB0' : tier === 1 ? '#FF4444' : '#fff';
         const strokeColor = tier === 0 ? 'rgba(180,140,0,0.6)' : tier === 1 ? 'rgba(100,70,0,0.7)' : 'rgba(0,0,0,0.5)';
-        const chars = label.split('');
-        const totalTextH = (chars.length - 1) * charGap;
-        // 可用径向空间：中心按钮外缘到扇区外缘
-        const innerR = 55;   // 中心按钮外边距
-        const outerR = sr - 14; // 扇区外缘留边
-        const midR = (innerR + outerR) / 2; // 可用空间中点
-        // 文字块中心对齐到 midR，第一个字最靠外
-        chars.forEach((ch, ci) => {
-          const ty = -(midR + totalTextH / 2) + ci * charGap;
+        label.split('').forEach((ch, ci) => {
+          const ty = -sr + 42 + ci * charGap;
           ctx.strokeStyle = strokeColor; ctx.lineWidth = 3; ctx.strokeText(ch, 0, ty);
           ctx.fillStyle = textColor; ctx.fillText(ch, 0, ty);
         });
