@@ -10,9 +10,7 @@ const DATA_FILE = path.join(__dirname, 'data.json');
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 奖品池 — 8 扇区，大小 & 概率均可独立调整
-// visualWeight : 转盘扇区视觉大小（越大扇区越宽，纯展示）
-// prob         : 实际中奖概率权重（越大越容易被抽到）← 改这里调概率！
+// 奖品池
 const PRIZES = [
   { id: 1, tier: 0, tierName: '超级大奖', name: '请你喝一杯 ☕', desc: '星巴克任选一杯',       color: '#E53935', count: 1, visualWeight: 2,   prob: 2  },
   { id: 2, tier: 3, tierName: '二等奖',   name: '会员周卡 📺',   desc: '视频平台会员周卡',     color: '#6A1B9A', count: 1, visualWeight: 4,   prob: 15 },
@@ -34,7 +32,6 @@ function loadData() {
     if (raw) {
       try {
         const data = JSON.parse(raw);
-        // 兼容旧数据：补齐 prob / visualWeight
         for (const r of data.remaining) {
           const ref = PRIZES.find(p => p.id === r.id);
           if (ref) {
@@ -58,7 +55,7 @@ app.get('/api/prizes', (req, res) => {
   res.json(PRIZES.map(p => ({ id: p.id, name: p.name, color: p.color, tier: p.tier, tierName: p.tierName, visualWeight: p.visualWeight })));
 });
 
-// 获取中奖记录（侧边栏滚动用）
+// 获取中奖记录
 app.get('/api/draws', (req, res) => {
   const data = loadData();
   res.json(data.draws.map(d => ({
@@ -79,7 +76,6 @@ app.post('/api/draw', (req, res) => {
   const name = nickname.trim();
   const data = loadData();
 
-  // 检查是否已抽过
   const existing = data.draws.find(d => d.nickname.toLowerCase() === name.toLowerCase());
   if (existing) {
     const prize = PRIZES.find(p => p.id === existing.prizeId);
@@ -90,12 +86,10 @@ app.post('/api/draw', (req, res) => {
     });
   }
 
-  // 检查奖品是否还有
   if (data.remaining.length === 0) {
     return res.status(410).json({ error: '奖品已全部抽完啦！' });
   }
 
-  // 加权随机抽取（按 prob 权重）
   const totalProb = data.remaining.reduce((sum, p) => sum + p.prob, 0);
   let rand = Math.random() * totalProb;
   let idx = 0;
@@ -126,33 +120,45 @@ app.post('/api/draw', (req, res) => {
   });
 });
 
-// 管理接口
-app.get('/api/admin/draws', (req, res) => {
+// ===== 管理接口 =====
+
+function authCheck(req, res) {
   const key = req.query.key;
-  if (key !== 'edom2025') return res.status(403).json({ error: '无权限' });
+  if (key !== 'edom2025') { res.status(403).json({ error: '无权限' }); return false; }
+  return true;
+}
+
+app.get('/api/admin/draws', (req, res) => {
+  if (!authCheck(req, res)) return;
   const data = loadData();
   res.json(data);
 });
 
-// 获取奖品概率配置
+// 获取奖品配置（含库存信息）
 app.get('/api/admin/config', (req, res) => {
-  const key = req.query.key;
-  if (key !== 'edom2025') return res.status(403).json({ error: '无权限' });
+  if (!authCheck(req, res)) return;
   const data = loadData();
-  const remaining = data.remaining.map(p => p.id);
+  // 统计每个奖品在 remaining 中的数量
+  const stockMap = {};
+  data.remaining.forEach(r => { stockMap[r.id] = (stockMap[r.id] || 0) + 1; });
+  // 统计已抽出数量
+  const drawnMap = {};
+  data.draws.forEach(d => { drawnMap[d.prizeId] = (drawnMap[d.prizeId] || 0) + 1; });
+
   res.json(PRIZES.map(p => ({
     id: p.id, tier: p.tier, tierName: p.tierName, name: p.name, desc: p.desc,
     color: p.color, visualWeight: p.visualWeight, prob: p.prob,
-    drawn: !remaining.includes(p.id)
+    stock: stockMap[p.id] || 0,
+    drawnCount: drawnMap[p.id] || 0,
   })));
 });
 
-// 更新概率配置
+// 更新奖品配置（内容 + 概率 + 扇区）
 app.post('/api/admin/config', (req, res) => {
-  const key = req.query.key;
-  if (key !== 'edom2025') return res.status(403).json({ error: '无权限' });
-  const updates = req.body; // [{ id, prob, visualWeight }]
+  if (!authCheck(req, res)) return;
+  const updates = req.body;
   if (!Array.isArray(updates)) return res.status(400).json({ error: '格式错误' });
+
   for (const u of updates) {
     const p = PRIZES.find(x => x.id === u.id);
     if (!p) continue;
@@ -164,6 +170,7 @@ app.post('/api/admin/config', (req, res) => {
     if (typeof u.tier === 'number' && u.tier >= 0) p.tier = u.tier;
     if (typeof u.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(u.color)) p.color = u.color;
   }
+
   // 同步更新 remaining 中的所有可变字段
   const data = loadData();
   for (const r of data.remaining) {
@@ -175,12 +182,29 @@ app.post('/api/admin/config', (req, res) => {
     }
   }
   saveData(data);
-  res.json({ ok: true, prizes: PRIZES.map(p => ({ id: p.id, prob: p.prob, visualWeight: p.visualWeight })) });
+  res.json({ ok: true });
+});
+
+// 补货：给指定奖品增加库存
+app.post('/api/admin/restock', (req, res) => {
+  if (!authCheck(req, res)) return;
+  const { id, count } = req.body;
+  const prize = PRIZES.find(p => p.id === id);
+  if (!prize) return res.status(400).json({ error: '奖品不存在' });
+  const addCount = Math.max(1, Math.min(count || 1, 50)); // 1-50
+
+  const data = loadData();
+  for (let i = 0; i < addCount; i++) {
+    data.remaining.push({ ...prize });
+  }
+  saveData(data);
+
+  const newStock = data.remaining.filter(r => r.id === id).length;
+  res.json({ ok: true, id, newStock });
 });
 
 app.post('/api/admin/reset', (req, res) => {
-  const key = req.query.key;
-  if (key !== 'edom2025') return res.status(403).json({ error: '无权限' });
+  if (!authCheck(req, res)) return;
   if (fs.existsSync(DATA_FILE)) fs.unlinkSync(DATA_FILE);
   res.json({ ok: true });
 });

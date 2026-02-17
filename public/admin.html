@@ -18,48 +18,56 @@
   .section{background:#16213e;border-radius:12px;padding:20px;margin-bottom:20px;border:1px solid #2a2a4e}
   .section h2{color:#FFD700;font-size:1.1em;margin-bottom:16px;display:flex;align-items:center;gap:8px}
 
-  /* 奖品卡片 */
   .prize-cards{display:flex;flex-direction:column;gap:12px}
   .prize-card{
     background:#1e2a4a;border:1px solid #2a3a5e;border-radius:10px;padding:16px;
-    display:grid;grid-template-columns:auto 1fr;gap:10px 16px;align-items:center;
-    transition:opacity 0.3s;
+    display:grid;grid-template-columns:auto 1fr;gap:8px 16px;align-items:center;
   }
-  .prize-card.drawn{opacity:0.4;pointer-events:none}
   .prize-card .card-header{
     grid-column:1/-1;display:flex;align-items:center;gap:10px;
-    padding-bottom:10px;border-bottom:1px solid #2a3a5e;
+    padding-bottom:10px;border-bottom:1px solid #2a3a5e;flex-wrap:wrap;
   }
-  .prize-card .card-header .id-badge{
+  .id-badge{
     width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;
     font-size:0.8em;font-weight:700;color:#fff;flex-shrink:0;
   }
-  .prize-card .card-header .status{margin-left:auto;font-size:0.8em}
-  .status-ok{color:#4CAF50}
-  .status-drawn{color:#E53935}
+  .stock-info{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:0.85em}
+  .stock-tag{padding:2px 8px;border-radius:4px;font-weight:600;font-size:0.8em}
+  .stock-ok{background:#1B5E20;color:#4CAF50}
+  .stock-out{background:#4A1010;color:#E53935}
+  .stock-num{color:#aaa}
 
   .field-label{font-size:0.8em;color:#888;text-align:right;white-space:nowrap}
-  .field-row{display:flex;gap:8px;align-items:center}
+  .field-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 
   .inp{padding:7px 10px;border-radius:6px;border:1px solid #444;background:#2a2a3e;color:#fff;font-size:0.9em;transition:border-color 0.2s}
   .inp:focus{outline:none;border-color:#FFD700}
   .inp-name{width:180px}
   .inp-desc{flex:1;min-width:160px}
-  .inp-tier-name{width:100px}
   .inp-num{width:70px;text-align:center}
   .inp-color{width:44px;height:32px;padding:2px;cursor:pointer;border-radius:6px;border:1px solid #444;background:#2a2a3e}
 
   select.inp{appearance:none;padding-right:24px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;background-size:10px}
 
-  .prob-bar{height:5px;border-radius:3px;background:#333;margin-top:2px;overflow:hidden;width:100px}
+  .prob-bar{height:5px;border-radius:3px;background:#333;overflow:hidden;width:100px}
   .prob-fill{height:100%;border-radius:3px;transition:width 0.3s}
+
+  .btn-restock{
+    padding:4px 12px;border-radius:6px;border:1px solid #4CAF50;
+    background:transparent;color:#4CAF50;font-size:0.8em;cursor:pointer;
+    transition:all 0.2s;white-space:nowrap;
+  }
+  .btn-restock:hover{background:#4CAF50;color:#fff}
+
+  .restock-row{grid-column:1/-1;display:flex;align-items:center;gap:8px;padding-top:8px;border-top:1px solid #2a3a5e}
+  .restock-row .inp-num{width:55px}
 
   .actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
   .btn{padding:10px 24px;border-radius:8px;border:none;font-weight:700;cursor:pointer;font-size:0.95em;transition:all 0.2s}
   .btn-save{background:#FFD700;color:#1a1a2e}
   .btn-save:hover{background:#FFA500}
-  .btn-reset{background:#444;color:#e0e0e0}
-  .btn-reset:hover{background:#555}
+  .btn-reset-btn{background:#444;color:#e0e0e0}
+  .btn-reset-btn:hover{background:#555}
   .btn-danger{background:#E53935;color:#fff}
   .btn-danger:hover{background:#C62828}
 
@@ -86,7 +94,7 @@
   @media(max-width:600px){
     .prize-card{grid-template-columns:1fr}
     .field-label{text-align:left}
-    .inp-name,.inp-desc,.inp-tier-name{width:100%}
+    .inp-name,.inp-desc{width:100%}
   }
 </style>
 </head>
@@ -94,7 +102,7 @@
 
 <div class="container">
   <h1>🎛️ 抽奖管理后台</h1>
-  <p class="subtitle">编辑奖品 / 调整概率 / 查看记录</p>
+  <p class="subtitle">编辑奖品 / 补货 / 调概率 / 查记录</p>
 
   <div class="auth" id="authBox">
     <input type="password" id="authKey" placeholder="输入管理密钥" onkeydown="if(event.key==='Enter')doAuth()">
@@ -102,23 +110,20 @@
   </div>
 
   <div id="content">
-    <!-- 奖品配置 -->
     <div class="section">
       <h2>🎁 奖品配置</h2>
       <div class="prize-cards" id="prizeCards"></div>
       <div class="actions">
-        <button class="btn btn-reset" onclick="loadConfig()">还原</button>
+        <button class="btn btn-reset-btn" onclick="loadConfig()">还原</button>
         <button class="btn btn-save" onclick="saveConfig()">💾 保存配置</button>
       </div>
     </div>
 
-    <!-- 中奖记录 -->
     <div class="section">
       <h2>📋 中奖记录</h2>
       <div class="draws-list" id="drawsList"></div>
     </div>
 
-    <!-- 危险操作 -->
     <div class="section">
       <h2>⚠️ 危险操作</h2>
       <div class="actions" style="justify-content:flex-start">
@@ -132,11 +137,11 @@
 
 <script>
 let KEY='', config=[];
-const TIER_OPTIONS = [
-  {value:0, label:'超级大奖'},
-  {value:1, label:'特等奖'},
-  {value:2, label:'一等奖'},
-  {value:3, label:'二等奖'},
+const TIER_OPTIONS=[
+  {value:0,label:'超级大奖'},
+  {value:1,label:'特等奖'},
+  {value:2,label:'一等奖'},
+  {value:3,label:'二等奖'},
 ];
 
 function doAuth(){
@@ -163,56 +168,63 @@ async function loadConfig(){
 
 function renderCards(){
   const el=document.getElementById('prizeCards');
-  const totalProb=config.filter(p=>!p.drawn).reduce((s,p)=>s+p.prob,0);
+  const totalProb=config.reduce((s,p)=>s+(p.stock>0?p.prob:0),0);
   const tierColors={0:'#FFD700',1:'#FF4444',2:'#FF8E53',3:'#888'};
 
   el.innerHTML=config.map((p,i)=>{
-    const pct=p.drawn?'-':(totalProb>0?(p.prob/totalProb*100).toFixed(1)+'%':'0%');
-    const barW=p.drawn?0:(totalProb>0?p.prob/totalProb*100:0);
+    const pct=p.stock>0&&totalProb>0?(p.prob/totalProb*100).toFixed(1)+'%':'—';
+    const barW=p.stock>0&&totalProb>0?p.prob/totalProb*100:0;
     const tierOpts=TIER_OPTIONS.map(t=>`<option value="${t.value}" ${p.tier===t.value?'selected':''}>${t.label}</option>`).join('');
 
-    return `<div class="prize-card ${p.drawn?'drawn':''}" data-idx="${i}">
+    return `<div class="prize-card" data-idx="${i}">
       <div class="card-header">
         <div class="id-badge" style="background:${p.color||'#888'}">${p.id}</div>
         <span class="badge badge-${p.tier}">${esc(p.tierName)}</span>
         <strong>${esc(p.name)}</strong>
-        <span class="status ${p.drawn?'status-drawn':'status-ok'}">${p.drawn?'已抽出':'待抽'}</span>
+        <div class="stock-info">
+          <span class="stock-num">库存 ${p.stock} / 已抽 ${p.drawnCount}</span>
+          <span class="stock-tag ${p.stock>0?'stock-ok':'stock-out'}">${p.stock>0?'有货':'已空'}</span>
+        </div>
       </div>
 
-      <span class="field-label">奖品名称</span>
+      <span class="field-label">名称</span>
       <div class="field-row">
-        <input class="inp inp-name" value="${esc(p.name)}" data-id="${p.id}" data-field="name" ${p.drawn?'disabled':''}>
+        <input class="inp inp-name" value="${esc(p.name)}" data-id="${p.id}" data-field="name">
       </div>
 
-      <span class="field-label">奖品描述</span>
+      <span class="field-label">描述</span>
       <div class="field-row">
-        <input class="inp inp-desc" value="${esc(p.desc||'')}" data-id="${p.id}" data-field="desc" ${p.drawn?'disabled':''}>
+        <input class="inp inp-desc" value="${esc(p.desc||'')}" data-id="${p.id}" data-field="desc">
       </div>
 
       <span class="field-label">等级</span>
       <div class="field-row">
-        <select class="inp inp-tier-name" data-id="${p.id}" data-field="tier" ${p.drawn?'disabled':''}>${tierOpts}</select>
-        <input class="inp inp-color" type="color" value="${p.color||'#888888'}" data-id="${p.id}" data-field="color" ${p.drawn?'disabled':''}>
+        <select class="inp" data-id="${p.id}" data-field="tier" style="width:110px">${tierOpts}</select>
+        <input class="inp inp-color" type="color" value="${p.color||'#888888'}" data-id="${p.id}" data-field="color">
       </div>
 
-      <span class="field-label">扇区大小</span>
+      <span class="field-label">扇区</span>
       <div class="field-row">
-        <input class="inp inp-num" type="number" min="0.5" max="10" step="0.5" value="${p.visualWeight}" data-id="${p.id}" data-field="visualWeight" ${p.drawn?'disabled':''}>
+        <input class="inp inp-num" type="number" min="0.5" max="10" step="0.5" value="${p.visualWeight}" data-id="${p.id}" data-field="visualWeight">
       </div>
 
-      <span class="field-label">概率权重</span>
+      <span class="field-label">概率</span>
       <div class="field-row">
-        <input class="inp inp-num" type="number" min="0" max="100" step="1" value="${p.prob}" data-id="${p.id}" data-field="prob" ${p.drawn?'disabled':''}>
+        <input class="inp inp-num" type="number" min="0" max="100" step="1" value="${p.prob}" data-id="${p.id}" data-field="prob">
         <span style="font-size:0.85em;color:#aaa;min-width:45px">${pct}</span>
         <div class="prob-bar"><div class="prob-fill" style="width:${barW}%;background:${tierColors[p.tier]||'#888'}"></div></div>
+      </div>
+
+      <div class="restock-row">
+        <span class="field-label">补货</span>
+        <input class="inp inp-num restock-input" type="number" min="1" max="50" value="1" data-id="${p.id}">
+        <button class="btn-restock" onclick="doRestock(${p.id})">+ 补货</button>
       </div>
     </div>`;
   }).join('');
 
-  // 绑定实时更新
-  el.querySelectorAll('.inp').forEach(inp=>{
+  el.querySelectorAll('.inp:not(.restock-input)').forEach(inp=>{
     inp.addEventListener('change',()=>syncField(inp));
-    inp.addEventListener('input',()=>{if(inp.type!=='number')syncField(inp)});
   });
 }
 
@@ -223,10 +235,9 @@ function syncField(inp){
   if(!p) return;
 
   if(field==='tier'){
-    const tierVal=parseInt(inp.value);
-    p.tier=tierVal;
-    const match=TIER_OPTIONS.find(t=>t.value===tierVal);
-    if(match) p.tierName=match.label;
+    p.tier=parseInt(inp.value);
+    const m=TIER_OPTIONS.find(t=>t.value===p.tier);
+    if(m) p.tierName=m.label;
   } else if(field==='prob'||field==='visualWeight'){
     p[field]=parseFloat(inp.value)||0;
   } else if(field==='color'){
@@ -252,6 +263,21 @@ async function saveConfig(){
     toast('✅ 配置已保存','ok');
     loadConfig();
   }catch(e){toast('保存失败','err')}
+}
+
+async function doRestock(id){
+  const inp=document.querySelector(`.restock-input[data-id="${id}"]`);
+  const count=parseInt(inp.value)||1;
+  try{
+    const r=await fetch('/api/admin/restock?key='+KEY,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id,count})
+    });
+    const data=await r.json();
+    if(!r.ok){toast(data.error||'补货失败','err');return}
+    toast(`✅ 补货成功，当前库存 ${data.newStock}`,'ok');
+    loadConfig();
+  }catch(e){toast('补货失败','err')}
 }
 
 async function loadDraws(){
@@ -287,7 +313,7 @@ async function doReset(){
 function toast(msg,type){
   const el=document.getElementById('toast');
   el.textContent=msg;el.className='toast toast-'+type+' show';
-  setTimeout(()=>el.classList.remove('show'),2000);
+  setTimeout(()=>el.classList.remove('show'),2500);
 }
 
 function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML}
