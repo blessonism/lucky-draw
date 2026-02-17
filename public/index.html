@@ -898,13 +898,22 @@
       const prize = data.prize;
       const idx = prizes.findIndex(p => p.id === prize.id);
       // 按 visualWeight 计算目标扇区中心角度
+      // 转盘绘制从 12 点钟（-90°）开始，第 0 个扇区就在指针正下方
+      // 要让第 idx 个扇区对准指针，需要顺时针旋转使其中心到达 12 点钟位置
       const totalW = prizes.reduce((s, p) => s + (p.visualWeight || 1), 0);
       let cumDeg = 0;
       for (let i = 0; i < idx; i++) cumDeg += ((prizes[i].visualWeight || 1) / totalW) * 360;
       const sectorDeg = ((prizes[idx].visualWeight || 1) / totalW) * 360;
-      const target = 360 - (cumDeg + sectorDeg / 2);
+      // 扇区中心相对于 12 点钟的角度偏移
+      const sectorCenterDeg = cumDeg + sectorDeg / 2;
+      // 需要旋转的目标：让这个扇区中心到达顶部
+      // 顺时针旋转 = 360 - sectorCenterDeg（取模后）
+      const targetAngle = 360 - (sectorCenterDeg % 360);
+      // 减去当前已有的旋转偏移（取模），确保每次都准确
+      const currentOffset = ((currentRotation % 360) + 360) % 360;
+      const delta = ((targetAngle - currentOffset) % 360 + 360) % 360;
       const spins = 5 + Math.floor(Math.random() * 3);
-      const total = spins * 360 + target;
+      const total = spins * 360 + delta;
 
       const canvas = document.getElementById('wheel');
       canvas.style.transition = 'transform 4s cubic-bezier(0.17,0.67,0.12,0.99)';
