@@ -864,23 +864,27 @@
         const strokeColor = tier === 0 ? 'rgba(180,140,0,0.6)' : tier === 1 ? 'rgba(100,70,0,0.7)' : 'rgba(0,0,0,0.5)';
         const chars = label.split('');
 
-        // 基于实际字形包围盒计算竖排文本块中心，而不是只按字符锚点均分
+        // 基于字形 metrics 做“光学中心”：
+        // 仅用 min/max 包围盒会把“字形墨水分布不均”忽略掉（例如“二等奖”里“二”更轻，“奖”更重），
+        // 在宽扇区里会显得整体偏向内侧。
         const metrics = chars.map((ch, ci) => {
           const m = ctx.measureText(ch);
-          return {
-            ch,
-            ci,
-            ascent: m.actualBoundingBoxAscent || fontSize * 0.78,
-            descent: m.actualBoundingBoxDescent || fontSize * 0.22,
-          };
+          const ascent = m.actualBoundingBoxAscent || fontSize * 0.78;
+          const descent = m.actualBoundingBoxDescent || fontSize * 0.22;
+          const inkW = (m.actualBoundingBoxLeft + m.actualBoundingBoxRight) || m.width || fontSize;
+          const inkH = ascent + descent;
+          const inkArea = Math.max(1, inkW * inkH);
+          // 当前字符“墨水中心”相对第 0 个字符基线的位置
+          const centerTerm = ci * charGap + (descent - ascent) / 2;
+          return { ch, ci, centerTerm, inkArea };
         });
-        const minTerm = Math.min(...metrics.map(g => -g.ascent + g.ci * charGap));
-        const maxTerm = Math.max(...metrics.map(g => g.descent + g.ci * charGap));
+        const weightedCenter = metrics.reduce((sum, g) => sum + g.centerTerm * g.inkArea, 0)
+          / metrics.reduce((sum, g) => sum + g.inkArea, 0);
 
-        // 宽扇区（visualWeight=4）会受到渐变明暗与描边厚度叠加影响，视觉上略偏内侧，做轻微外移补偿
-        const opticalNudge = arcDeg >= 50 ? -4 : 0; // 620px 画布坐标，约等于 CSS 2px
+        // 宽扇区在明暗渐变+描边下仍会轻微偏内，补一点向外的 optical nudge
+        const opticalNudge = (prizes[i].visualWeight || 1) >= 4 ? -5 : 0; // 620px 坐标，约等于 CSS 2.5px
         const targetCenterY = textCenterY + opticalNudge;
-        const baseY = targetCenterY - (minTerm + maxTerm) / 2;
+        const baseY = targetCenterY - weightedCenter;
 
         ctx.strokeStyle = strokeColor;
         ctx.fillStyle = textColor;
