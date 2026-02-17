@@ -141,8 +141,8 @@ app.get('/api/admin/config', (req, res) => {
   const data = loadData();
   const remaining = data.remaining.map(p => p.id);
   res.json(PRIZES.map(p => ({
-    id: p.id, tierName: p.tierName, name: p.name,
-    visualWeight: p.visualWeight, prob: p.prob,
+    id: p.id, tier: p.tier, tierName: p.tierName, name: p.name, desc: p.desc,
+    color: p.color, visualWeight: p.visualWeight, prob: p.prob,
     drawn: !remaining.includes(p.id)
   })));
 });
@@ -158,12 +158,21 @@ app.post('/api/admin/config', (req, res) => {
     if (!p) continue;
     if (typeof u.prob === 'number' && u.prob >= 0) p.prob = u.prob;
     if (typeof u.visualWeight === 'number' && u.visualWeight > 0) p.visualWeight = u.visualWeight;
+    if (typeof u.name === 'string' && u.name.trim()) p.name = u.name.trim();
+    if (typeof u.desc === 'string' && u.desc.trim()) p.desc = u.desc.trim();
+    if (typeof u.tierName === 'string' && u.tierName.trim()) p.tierName = u.tierName.trim();
+    if (typeof u.tier === 'number' && u.tier >= 0) p.tier = u.tier;
+    if (typeof u.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(u.color)) p.color = u.color;
   }
-  // 同步更新 remaining 中的 prob/visualWeight
+  // 同步更新 remaining 中的所有可变字段
   const data = loadData();
   for (const r of data.remaining) {
     const p = PRIZES.find(x => x.id === r.id);
-    if (p) { r.prob = p.prob; r.visualWeight = p.visualWeight; }
+    if (p) {
+      r.prob = p.prob; r.visualWeight = p.visualWeight;
+      r.name = p.name; r.desc = p.desc;
+      r.tierName = p.tierName; r.tier = p.tier; r.color = p.color;
+    }
   }
   saveData(data);
   res.json({ ok: true, prizes: PRIZES.map(p => ({ id: p.id, prob: p.prob, visualWeight: p.visualWeight })) });
