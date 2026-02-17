@@ -848,9 +848,12 @@
         const strokeColor = tier === 0 ? 'rgba(180,140,0,0.6)' : tier === 1 ? 'rgba(100,70,0,0.7)' : 'rgba(0,0,0,0.5)';
         const chars = label.split('');
         const totalTextH = (chars.length - 1) * charGap;
-        // 径向居中：文字块中心放在扇区半径的中点（中心按钮外缘到扇区外缘的中间）
-        const midY = -(sr + 50) / 2; // 50 ≈ 中心按钮半径 + 间距
-        const startY = midY - totalTextH / 2;
+        // 径向居中：可用空间从扇区外缘内侧到中心按钮外缘
+        // 旋转后坐标系：y=-sr 是外缘，y=0 是中心
+        const outerLimit = -sr + 18;   // 外缘留 18px 边距
+        const innerLimit = -48;        // 中心按钮外缘 (btnR=38 + 10px 间距)
+        const centerY = (outerLimit + innerLimit) / 2;  // 可用空间中点
+        const startY = centerY - totalTextH / 2;
         chars.forEach((ch, ci) => {
           const ty = startY + ci * charGap;
           ctx.strokeStyle = strokeColor; ctx.lineWidth = 3; ctx.strokeText(ch, 0, ty);
